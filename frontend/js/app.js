@@ -1,300 +1,554 @@
-"""Frontend JavaScript application"""
-// Main application entry point
+/**
+ * YouTube Auto Republisher - Frontend App
+ * Main application logic
+ */
 
-const app = {
-    currentUser: null,
-    currentTab: 'dashboard',
-    queue: [],
-    
-    async init() {
-        console.log('Initializing YouTube Auto Republisher');
-        await this.checkAuth();
-        this.setupEventListeners();
-    },
-    
-    async checkAuth() {
-        try {
-            const response = await fetch('/api/auth/status');
-            const data = await response.json();
-            
-            if (data.authenticated) {
-                this.currentUser = data.user;
-                this.showDashboard();
-            } else {
-                this.showLogin();
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
-            this.showLogin();
-        }
-    },
-    
-    showLogin() {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-            <div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-                <div class="glass p-8 rounded-lg max-w-md w-full mx-4">
-                    <h1 class="text-3xl font-bold mb-2 text-center">🎬 YouTube Auto Republisher</h1>
-                    <p class="text-center text-gray-400 mb-6">Automatically republish your videos on schedule</p>
-                    <a href="/api/auth/login" class="btn-primary w-full text-center py-3 rounded-lg font-semibold">
-                        <i class="fab fa-google mr-2"></i>Connect Your YouTube Channel
-                    </a>
-                    <p class="text-center text-gray-500 text-sm mt-4">Only videos you own or have permission to reuse</p>
-                </div>
-            </div>
-        `;
-    },
-    
-    showDashboard() {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-            <div class="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-                <!-- Navigation -->
-                <nav class="glass border-b border-gray-700 sticky top-0 z-50">
-                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                        <div class="flex items-center justify-between">
-                            <h1 class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-green-400">🎬 YouTube Auto Republisher</h1>
-                            <div class="flex items-center gap-4">
-                                <img src="${this.currentUser.channel_thumbnail}" alt="Channel" class="w-10 h-10 rounded-full" />
-                                <span class="text-sm font-medium">${this.currentUser.channel_title}</span>
-                                <button class="btn-secondary" onclick="app.logout()">
-                                    <i class="fas fa-sign-out-alt mr-2"></i>Logout
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </nav>
-                
-                <!-- Main Content -->
-                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    <!-- Tab Navigation -->
-                    <div class="flex gap-6 mb-8 border-b border-gray-700">
-                        <button class="tab active" onclick="app.switchTab('dashboard')"><i class="fas fa-chart-line mr-2"></i>Dashboard</button>
-                        <button class="tab" onclick="app.switchTab('queue')"><i class="fas fa-list mr-2"></i>Queue</button>
-                        <button class="tab" onclick="app.switchTab('source')"><i class="fas fa-search mr-2"></i>Find Videos</button>
-                        <button class="tab" onclick="app.switchTab('settings')"><i class="fas fa-cog mr-2"></i>Settings</button>
-                        <button class="tab" onclick="app.switchTab('logs')"><i class="fas fa-file-alt mr-2"></i>Logs</button>
-                    </div>
-                    
-                    <!-- Dashboard Tab -->
-                    <div id="dashboard-tab" class="tab-content">
-                        <div class="grid-3">
-                            <div class="stat-card">
-                                <div class="stat-number" id="queued-count">0</div>
-                                <div class="stat-label">Videos in Queue</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="uploaded-count">0</div>
-                                <div class="stat-label">Uploaded Today</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="storage-used">0 GB</div>
-                                <div class="stat-label">Storage Used</div>
-                            </div>
-                        </div>
-                        <div class="card mt-8">
-                            <h2 class="text-xl font-bold mb-4">Auto-Upload Status</h2>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-green-400 font-semibold">Next Upload: In 2h 15m</p>
-                                    <p class="text-gray-400 text-sm mt-1">Scheduled for 6:45 PM</p>
-                                </div>
-                                <span class="badge badge-success">Active</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Queue Tab -->
-                    <div id="queue-tab" class="tab-content hidden">
-                        <div class="card">
-                            <h2 class="text-xl font-bold mb-4">Upload Queue</h2>
-                            <div id="queue-list">
-                                <p class="text-gray-400 text-center py-8">No videos in queue. Add some videos to get started!</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Source Tab -->
-                    <div id="source-tab" class="tab-content hidden">
-                        <div class="card">
-                            <h2 class="text-xl font-bold mb-4">Find Videos</h2>
-                            <div class="flex gap-4 mb-6">
-                                <input type="text" id="search-input" class="input-field flex-1" placeholder="Search for videos..." />
-                                <button class="btn-primary" onclick="app.searchVideos()"><i class="fas fa-search mr-2"></i>Search</button>
-                            </div>
-                            <div id="search-results" class="grid-2"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Settings Tab -->
-                    <div id="settings-tab" class="tab-content hidden">
-                        <div class="card">
-                            <h2 class="text-xl font-bold mb-4">Settings</h2>
-                            <div class="space-y-6">
-                                <div>
-                                    <label class="block text-sm font-medium mb-2">Upload Interval (hours)</label>
-                                    <input type="number" class="input-field w-full" value="2.5" step="0.5" />
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium mb-2">Default Privacy</label>
-                                    <select class="input-field w-full">
-                                        <option>Private</option>
-                                        <option>Unlisted</option>
-                                        <option>Public</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="flex items-center">
-                                        <input type="checkbox" class="mr-3" checked />
-                                        <span class="text-sm font-medium">Enable Auto Upload</span>
-                                    </label>
-                                </div>
-                                <button class="btn-primary w-full"><i class="fas fa-save mr-2"></i>Save Settings</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Logs Tab -->
-                    <div id="logs-tab" class="tab-content hidden">
-                        <div class="card">
-                            <h2 class="text-xl font-bold mb-4">Application Logs</h2>
-                            <div id="logs-list" class="space-y-2">
-                                <p class="text-gray-400 text-center py-8">No logs yet</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        this.loadQueue();
-    },
-    
-    switchTab(tabName) {
-        // Hide all tabs
-        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+const API_BASE = '/api';
+let currentUser = null;
+let videos = [];
+let queue = [];
+let uploadTasks = [];
+
+/**
+ * Initialize application
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('App initializing...');
+    await checkAuthStatus();
+    loadSettings();
+    setupEventListeners();
+    startRefreshInterval();
+});
+
+/**
+ * Check authentication status
+ */
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/status`);
+        const data = await response.json();
         
-        // Show selected tab
-        const tabElement = document.getElementById(`${tabName}-tab`);
-        if (tabElement) {
-            tabElement.classList.remove('hidden');
+        if (data.authenticated && data.user) {
+            currentUser = data.user;
+            showDashboard();
+            await loadQueue();
+            await loadStats();
+        } else {
+            showLoginScreen();
         }
-        
-        // Mark tab as active
-        event.target.classList.add('active');
-        this.currentTab = tabName;
-    },
-    
-    async loadQueue() {
-        try {
-            const response = await fetch('/api/queue');
-            const data = await response.json();
-            this.queue = data.queue || [];
-            
-            const queueList = document.getElementById('queue-list');
-            if (this.queue.length === 0) {
-                queueList.innerHTML = '<p class="text-gray-400 text-center py-8">No videos in queue</p>';
-            } else {
-                queueList.innerHTML = this.queue.map((item, index) => `
-                    <div class="list-item">
-                        <div>
-                            <p class="font-semibold">${item.title}</p>
-                            <p class="text-sm text-gray-400">Position #${index + 1} • ${item.status}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button class="btn-secondary" onclick="app.removeFromQueue(${item.id})"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-            
-            document.getElementById('queued-count').textContent = this.queue.length;
-        } catch (error) {
-            console.error('Failed to load queue:', error);
-        }
-    },
-    
-    async searchVideos() {
-        const query = document.getElementById('search-input').value;
-        if (!query) return;
-        
-        try {
-            const response = await fetch('/api/videos/search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
-            });
-            const data = await response.json();
-            
-            const results = document.getElementById('search-results');
-            results.innerHTML = (data.videos || []).map(video => `
-                <div class="card">
-                    <img src="${video.thumbnail_url}" alt="${video.title}" class="w-full h-40 object-cover rounded mb-3" />
-                    <p class="font-semibold text-sm">${video.title}</p>
-                    <button class="btn-primary w-full mt-3" onclick="app.addToQueue(${video.id})">Add to Queue</button>
-                </div>
-            `).join('');
-        } catch (error) {
-            console.error('Search failed:', error);
-        }
-    },
-    
-    async addToQueue(videoId) {
-        try {
-            const response = await fetch('/api/queue', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ video_id: videoId })
-            });
-            
-            if (response.ok) {
-                this.showToast('Video added to queue', 'success');
-                await this.loadQueue();
-            }
-        } catch (error) {
-            console.error('Failed to add video:', error);
-            this.showToast('Failed to add video', 'error');
-        }
-    },
-    
-    async removeFromQueue(itemId) {
-        try {
-            const response = await fetch(`/api/queue/${itemId}`, { method: 'DELETE' });
-            if (response.ok) {
-                this.showToast('Video removed from queue', 'success');
-                await this.loadQueue();
-            }
-        } catch (error) {
-            console.error('Failed to remove video:', error);
-        }
-    },
-    
-    async logout() {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-            location.reload();
-        } catch (error) {
-            console.error('Logout failed:', error);
-        }
-    },
-    
-    showToast(message, type = 'info') {
-        const toast = document.createElement('div');
-        toast.className = `toast badge badge-${type}`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-        
-        setTimeout(() => toast.remove(), 3000);
-    },
-    
-    setupEventListeners() {
-        // Add any additional event listeners here
+    } catch (error) {
+        console.error('Auth check failed:', error);
+        showLoginScreen();
     }
-};
+}
 
-// Initialize app when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => app.init());
-} else {
-    app.init();
+/**
+ * Show dashboard
+ */
+function showDashboard() {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    document.getElementById('loginBtn').classList.add('hidden');
+    document.getElementById('userInfo').classList.remove('hidden');
+    
+    document.getElementById('userName').textContent = currentUser.channel_title;
+    document.getElementById('userAvatar').src = currentUser.channel_thumbnail;
+}
+
+/**
+ * Show login screen
+ */
+function showLoginScreen() {
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('dashboard').classList.add('hidden');
+    document.getElementById('loginBtn').classList.remove('hidden');
+    document.getElementById('userInfo').classList.add('hidden');
+}
+
+/**
+ * Connect to YouTube
+ */
+async function connectYouTube() {
+    try {
+        const response = await fetch(`${API_BASE}/auth/login`);
+        const data = await response.json();
+        
+        if (data.success) {
+            window.location.href = data.authorization_url;
+        }
+    } catch (error) {
+        showToast('Failed to connect to YouTube', 'error');
+        console.error('Connection failed:', error);
+    }
+}
+
+/**
+ * Logout
+ */
+async function logout() {
+    try {
+        await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+        currentUser = null;
+        showLoginScreen();
+        showToast('Logged out successfully', 'success');
+    } catch (error) {
+        showToast('Logout failed', 'error');
+    }
+}
+
+/**
+ * Load queue
+ */
+async function loadQueue() {
+    try {
+        const response = await fetch(`${API_BASE}/queue`);
+        const data = await response.json();
+        
+        queue = data.queue || [];
+        document.getElementById('queueCount').textContent = queue.length;
+        
+        renderQueue();
+    } catch (error) {
+        console.error('Failed to load queue:', error);
+    }
+}
+
+/**
+ * Render queue
+ */
+function renderQueue() {
+    const queueList = document.getElementById('queueList');
+    
+    if (queue.length === 0) {
+        queueList.innerHTML = `
+            <div class="text-center py-12 text-gray-400">
+                <i class="fas fa-inbox text-4xl mb-4"></i>
+                <p>No items in queue</p>
+            </div>
+        `;
+        return;
+    }
+    
+    queueList.innerHTML = queue.map((item, index) => `
+        <div class="glass-card p-4 rounded-lg animate-slide-in" style="animation-delay: ${index * 50}ms">
+            <div class="flex items-start space-x-4">
+                <img src="${item.thumbnail_url}" alt="${item.title}" class="w-24 h-16 rounded object-cover">
+                <div class="flex-1">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <h3 class="font-semibold line-clamp-2">${item.title}</h3>
+                            <p class="text-gray-400 text-sm">Position: ${item.position}</p>
+                        </div>
+                        <span class="badge ${getStatusBadgeClass(item.status)}">${item.status}</span>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 text-sm text-gray-400 mb-3">
+                        <span><i class="fas fa-lock-alt mr-1"></i>${item.privacy}</span>
+                        <span><i class="fas fa-redo mr-1"></i>Retries: ${item.retry_count}</span>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: ${item.progress_percent || 0}%"></div>
+                    </div>
+                    
+                    <div class="flex space-x-2 mt-3">
+                        <button onclick="editQueueItem(${item.id})" class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded text-sm transition">
+                            <i class="fas fa-edit mr-1"></i>Edit
+                        </button>
+                        <button onclick="deleteQueueItem(${item.id})" class="px-3 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded text-sm transition">
+                            <i class="fas fa-trash mr-1"></i>Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Get status badge class
+ */
+function getStatusBadgeClass(status) {
+    const classes = {
+        'pending': 'badge-info',
+        'downloading': 'badge-warning',
+        'queued': 'badge-info',
+        'uploading': 'badge-warning',
+        'completed': 'badge-success',
+        'failed': 'badge-error'
+    };
+    return classes[status] || 'badge-info';
+}
+
+/**
+ * Load statistics
+ */
+async function loadStats() {
+    try {
+        const response = await fetch(`${API_BASE}/queue`);
+        const data = await response.json();
+        
+        const stats = {
+            queue: data.count || 0,
+            downloaded: data.queue?.filter(q => q.local_file_path).length || 0,
+            uploaded: data.queue?.filter(q => q.status === 'completed').length || 0
+        };
+        
+        document.getElementById('queueCount').textContent = stats.queue;
+        document.getElementById('downloadedCount').textContent = stats.downloaded;
+        document.getElementById('uploadedCount').textContent = stats.uploaded;
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
+}
+
+/**
+ * Search videos
+ */
+async function searchVideos() {
+    const input = document.getElementById('searchInput');
+    const query = input.value.trim();
+    
+    if (!query) {
+        showToast('Please enter a search query', 'warning');
+        return;
+    }
+    
+    try {
+        const sourceType = document.querySelector('input[name="source"]:checked').value;
+        
+        if (sourceType === 'channel') {
+            const response = await fetch(`${API_BASE}/videos/list?max_results=50`);
+            const data = await response.json();
+            videos = data.videos || [];
+        } else {
+            const urls = query.split(',').map(url => url.trim());
+            // Download videos from URLs
+            for (const url of urls) {
+                await downloadVideoFromUrl(url);
+            }
+        }
+        
+        renderVideosGrid();
+    } catch (error) {
+        showToast('Search failed', 'error');
+        console.error('Search error:', error);
+    }
+}
+
+/**
+ * Render videos grid
+ */
+function renderVideosGrid() {
+    const videosList = document.getElementById('videosList');
+    
+    if (videos.length === 0) {
+        videosList.innerHTML = `
+            <div class="text-center py-12 text-gray-400">
+                <i class="fas fa-film text-4xl mb-4"></i>
+                <p>No videos found</p>
+            </div>
+        `;
+        return;
+    }
+    
+    videosList.innerHTML = videos.map((video, index) => `
+        <div class="glass-card rounded-lg overflow-hidden animate-slide-in" style="animation-delay: ${index * 50}ms">
+            <img src="${video.thumbnail_url}" alt="${video.title}" class="w-full h-32 object-cover">
+            <div class="p-4">
+                <h3 class="font-semibold line-clamp-2 mb-2">${video.title}</h3>
+                <p class="text-sm text-gray-400 line-clamp-2 mb-3">${video.description || 'No description'}</p>
+                <button onclick="addToQueue(${video.id})" class="w-full px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 rounded font-semibold transition">
+                    <i class="fas fa-plus mr-2"></i>Add to Queue
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Add video to queue
+ */
+async function addToQueue(videoId) {
+    try {
+        const response = await fetch(`${API_BASE}/queue`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ video_id: videoId })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showToast('Video added to queue', 'success');
+            await loadQueue();
+        } else {
+            showToast(data.error || 'Failed to add to queue', 'error');
+        }
+    } catch (error) {
+        showToast('Add to queue failed', 'error');
+        console.error('Error:', error);
+    }
+}
+
+/**
+ * Delete queue item
+ */
+async function deleteQueueItem(queueItemId) {
+    if (!confirm('Are you sure?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/queue/${queueItemId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Removed from queue', 'success');
+            await loadQueue();
+        }
+    } catch (error) {
+        showToast('Delete failed', 'error');
+    }
+}
+
+/**
+ * Load settings
+ */
+async function loadSettings() {
+    try {
+        const response = await fetch(`${API_BASE}/settings`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const settings = data.settings;
+            document.getElementById('uploadInterval').value = settings.upload_interval_hours;
+            document.getElementById('maxRetries').value = settings.max_retries;
+            document.getElementById('defaultPrivacy').value = settings.default_privacy;
+            document.getElementById('videoQuality').value = settings.video_quality;
+            document.getElementById('autoSchedule').checked = settings.auto_schedule;
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+}
+
+/**
+ * Save settings
+ */
+async function saveSettings(e) {
+    e.preventDefault();
+    
+    const settings = {
+        upload_interval_hours: parseFloat(document.getElementById('uploadInterval').value),
+        max_retries: parseInt(document.getElementById('maxRetries').value),
+        default_privacy: document.getElementById('defaultPrivacy').value,
+        video_quality: document.getElementById('videoQuality').value,
+        auto_schedule: document.getElementById('autoSchedule').checked
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showToast('Settings saved successfully', 'success');
+        } else {
+            showToast('Failed to save settings', 'error');
+        }
+    } catch (error) {
+        showToast('Save failed', 'error');
+    }
+}
+
+/**
+ * Load logs
+ */
+async function loadLogs() {
+    try {
+        const logType = document.getElementById('logTypeFilter').value;
+        let url = `${API_BASE}/logs`;
+        if (logType) url += `?type=${logType}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const logsList = document.getElementById('logsList');
+        if (data.logs.length === 0) {
+            logsList.innerHTML = `
+                <div class="text-center py-12 text-gray-400">
+                    <i class="fas fa-inbox text-4xl mb-4"></i>
+                    <p>No logs</p>
+                </div>
+            `;
+            return;
+        }
+        
+        logsList.innerHTML = data.logs.map(log => `
+            <div class="glass-card p-3 rounded text-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="font-semibold">${log.message}</p>
+                        <p class="text-gray-400 text-xs mt-1">${new Date(log.created_at).toLocaleString()}</p>
+                    </div>
+                    <span class="badge ${getLogLevelBadgeClass(log.level)}">${log.level}</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load logs:', error);
+    }
+}
+
+/**
+ * Get log level badge class
+ */
+function getLogLevelBadgeClass(level) {
+    const classes = {
+        'INFO': 'badge-info',
+        'WARNING': 'badge-warning',
+        'ERROR': 'badge-error',
+        'DEBUG': 'badge-info'
+    };
+    return classes[level] || 'badge-info';
+}
+
+/**
+ * Clear old logs
+ */
+async function clearLogs() {
+    if (!confirm('Are you sure? This will delete logs older than 30 days.')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/logs/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: 30 })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showToast('Logs cleared', 'success');
+            await loadLogs();
+        }
+    } catch (error) {
+        showToast('Clear failed', 'error');
+    }
+}
+
+/**
+ * Show tab
+ */
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    
+    // Show selected tab
+    document.getElementById(tabName + 'Tab').classList.remove('hidden');
+    event.target.closest('.tab-btn').classList.add('active');
+    
+    // Load data for specific tabs
+    if (tabName === 'logs') {
+        loadLogs();
+    }
+}
+
+/**
+ * Show toast notification
+ */
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    
+    const bgClass = {
+        'success': 'bg-green-500/20 border-green-500/50 text-green-300',
+        'error': 'bg-red-500/20 border-red-500/50 text-red-300',
+        'warning': 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300',
+        'info': 'bg-blue-500/20 border-blue-500/50 text-blue-300'
+    }[type];
+    
+    const icon = {
+        'success': 'fa-check-circle',
+        'error': 'fa-exclamation-circle',
+        'warning': 'fa-exclamation-triangle',
+        'info': 'fa-info-circle'
+    }[type];
+    
+    toast.className = `glass-card border p-4 rounded-lg animate-slide-in ${bgClass}`;
+    toast.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${icon} mr-3"></i>
+            <span>${message}</span>
+        </div>
+    `;
+    
+    container.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+/**
+ * Setup event listeners
+ */
+function setupEventListeners() {
+    // Settings form
+    document.getElementById('settingsForm')?.addEventListener('submit', saveSettings);
+    
+    // Source type change
+    document.querySelectorAll('input[name="source"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            const label = document.getElementById('searchLabel');
+            const input = document.getElementById('searchInput');
+            
+            if (radio.value === 'channel') {
+                label.textContent = 'Search Videos';
+                input.placeholder = 'Enter search query...';
+            } else {
+                label.textContent = 'Video URLs';
+                input.placeholder = 'Enter video URLs (comma-separated)...';
+            }
+        });
+    });
+}
+
+/**
+ * Start refresh interval
+ */
+function startRefreshInterval() {
+    // Refresh queue every 10 seconds
+    setInterval(() => {
+        if (currentUser) {
+            loadQueue();
+            loadStats();
+        }
+    }, 10000);
+}
+
+/**
+ * Download video from URL
+ */
+async function downloadVideoFromUrl(url) {
+    try {
+        const response = await fetch(`${API_BASE}/videos/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                url: url,
+                video_id: url.split('v=')[1] || url.split('youtu.be/')[1],
+                quality: document.getElementById('videoQuality').value
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showToast(`Video downloaded: ${data.title}`, 'success');
+        }
+    } catch (error) {
+        console.error('Download error:', error);
+    }
 }
