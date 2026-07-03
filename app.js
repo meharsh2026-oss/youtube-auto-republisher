@@ -3,7 +3,9 @@
  * Main application logic
  */
 
-const API_BASE = '/api';
+const API_BASE = window.location.hostname.includes('github.io')
+    ? 'https://YOUR-RENDER-URL.onrender.com/api'
+    : '/api';
 let currentUser = null;
 let videos = [];
 let queue = [];
