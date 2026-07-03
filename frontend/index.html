@@ -8,8 +8,301 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-    <div id="app"></div>
+<body class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+    <!-- Navigation -->
+    <nav class="backdrop-blur-md bg-black/30 border-b border-white/10 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-play text-white"></i>
+                </div>
+                <h1 class="text-2xl font-bold bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent">
+                    YouTube Auto Republisher
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div id="userInfo" class="hidden flex items-center space-x-3">
+                    <img id="userAvatar" src="" alt="User" class="w-10 h-10 rounded-full">
+                    <span id="userName" class="text-sm"></span>
+                    <button onclick="logout()" class="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded-lg transition">
+                        Logout
+                    </button>
+                </div>
+                <div id="loginBtn" class="hidden">
+                    <button onclick="connectYouTube()" class="px-6 py-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-lg font-semibold transition transform hover:scale-105">
+                        <i class="fab fa-youtube mr-2"></i>Connect YouTube
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Dashboard -->
+        <div id="dashboard" class="hidden space-y-8">
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="glass-card p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">Queue Items</p>
+                            <p id="queueCount" class="text-3xl font-bold text-white mt-2">0</p>
+                        </div>
+                        <i class="fas fa-list text-4xl text-blue-500/30"></i>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">Videos Downloaded</p>
+                            <p id="downloadedCount" class="text-3xl font-bold text-white mt-2">0</p>
+                        </div>
+                        <i class="fas fa-download text-4xl text-green-500/30"></i>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">Uploaded</p>
+                            <p id="uploadedCount" class="text-3xl font-bold text-white mt-2">0</p>
+                        </div>
+                        <i class="fas fa-cloud-upload-alt text-4xl text-purple-500/30"></i>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-xl">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">Next Upload</p>
+                            <p id="nextUpload" class="text-lg font-bold text-white mt-2">--:--:--</p>
+                        </div>
+                        <i class="fas fa-clock text-4xl text-orange-500/30"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex space-x-4 border-b border-white/10">
+                <button onclick="showTab('queue')" class="tab-btn active px-6 py-3 text-white font-semibold border-b-2 border-pink-500 transition">
+                    <i class="fas fa-list mr-2"></i>Queue
+                </button>
+                <button onclick="showTab('source')" class="tab-btn px-6 py-3 text-gray-400 font-semibold hover:text-white transition">
+                    <i class="fas fa-search mr-2"></i>Source
+                </button>
+                <button onclick="showTab('settings')" class="tab-btn px-6 py-3 text-gray-400 font-semibold hover:text-white transition">
+                    <i class="fas fa-cog mr-2"></i>Settings
+                </button>
+                <button onclick="showTab('logs')" class="tab-btn px-6 py-3 text-gray-400 font-semibold hover:text-white transition">
+                    <i class="fas fa-file-alt mr-2"></i>Logs
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <!-- Queue Tab -->
+            <div id="queueTab" class="tab-content">
+                <div class="glass-card p-6 rounded-xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-list mr-3 text-blue-500"></i>Upload Queue
+                    </h2>
+                    <div id="queueList" class="space-y-4">
+                        <div class="text-center py-12 text-gray-400">
+                            <i class="fas fa-inbox text-4xl mb-4"></i>
+                            <p>No items in queue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Source Tab -->
+            <div id="sourceTab" class="tab-content hidden">
+                <div class="glass-card p-6 rounded-xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-search mr-3 text-green-500"></i>Find Videos
+                    </h2>
+                    
+                    <div class="space-y-6">
+                        <!-- Source Selection -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-3">Video Source</label>
+                            <div class="flex space-x-4">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="radio" name="source" value="channel" checked class="mr-2">
+                                    <span>My Channel</span>
+                                </label>
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="radio" name="source" value="urls" class="mr-2">
+                                    <span>Custom URLs</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Search/URL Input -->
+                        <div>
+                            <label class="block text-sm font-semibold mb-3" id="searchLabel">Search Videos</label>
+                            <div class="flex space-x-3">
+                                <input 
+                                    type="text" 
+                                    id="searchInput" 
+                                    placeholder="Enter search query or video URLs (comma-separated)..."
+                                    class="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition"
+                                >
+                                <button onclick="searchVideos()" class="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 rounded-lg font-semibold transition">
+                                    <i class="fas fa-search mr-2"></i>Search
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Videos Grid -->
+                        <div>
+                            <h3 class="text-lg font-semibold mb-4">Available Videos</h3>
+                            <div id="videosList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div class="text-center py-12 text-gray-400">
+                                    <i class="fas fa-film text-4xl mb-4"></i>
+                                    <p>No videos found</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settingsTab" class="tab-content hidden">
+                <div class="glass-card p-6 rounded-xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-cog mr-3 text-purple-500"></i>Settings
+                    </h2>
+                    
+                    <form id="settingsForm" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Upload Interval (Hours)</label>
+                                <input 
+                                    type="number" 
+                                    id="uploadInterval" 
+                                    min="0.5" 
+                                    step="0.5"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Max Retries</label>
+                                <input 
+                                    type="number" 
+                                    id="maxRetries" 
+                                    min="1"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Default Privacy</label>
+                                <select id="defaultPrivacy" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition">
+                                    <option value="private">Private</option>
+                                    <option value="unlisted">Unlisted</option>
+                                    <option value="public">Public</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-semibold mb-2">Video Quality</label>
+                                <select id="videoQuality" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition">
+                                    <option value="best">Best Available</option>
+                                    <option value="1080p">1080p</option>
+                                    <option value="720p">720p</option>
+                                    <option value="480p">480p</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="flex items-center space-x-3 cursor-pointer">
+                                <input type="checkbox" id="autoSchedule" class="w-4 h-4">
+                                <span class="text-sm font-semibold">Enable Auto-Schedule</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 rounded-lg font-semibold transition">
+                            <i class="fas fa-save mr-2"></i>Save Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logsTab" class="tab-content hidden">
+                <div class="glass-card p-6 rounded-xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center">
+                        <i class="fas fa-file-alt mr-3 text-orange-500"></i>Application Logs
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex space-x-3">
+                            <select id="logTypeFilter" class="px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-pink-500 transition">
+                                <option value="">All Types</option>
+                                <option value="download">Download</option>
+                                <option value="upload">Upload</option>
+                                <option value="auth">Auth</option>
+                                <option value="error">Error</option>
+                            </select>
+                            <button onclick="loadLogs()" class="px-6 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg font-semibold transition">
+                                <i class="fas fa-sync mr-2"></i>Refresh
+                            </button>
+                            <button onclick="clearLogs()" class="px-6 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded-lg font-semibold transition">
+                                <i class="fas fa-trash mr-2"></i>Clear Old
+                            </button>
+                        </div>
+
+                        <div id="logsList" class="space-y-3 max-h-96 overflow-y-auto">
+                            <div class="text-center py-12 text-gray-400">
+                                <i class="fas fa-inbox text-4xl mb-4"></i>
+                                <p>No logs</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Screen -->
+        <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+            <div class="glass-card p-12 rounded-2xl max-w-md w-full backdrop-blur-xl">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-play text-4xl text-white"></i>
+                    </div>
+                    <h1 class="text-3xl font-bold mb-2">YouTube Auto Republisher</h1>
+                    <p class="text-gray-400">Automatically republish your videos on schedule</p>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="bg-yellow-500/20 border border-yellow-500/50 rounded-lg p-4">
+                        <p class="text-yellow-300 text-sm">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            This app is designed ONLY for videos you own or have permission to reuse. Respect copyright and YouTube's ToS.
+                        </p>
+                    </div>
+
+                    <button onclick="connectYouTube()" class="w-full px-6 py-4 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-lg font-bold text-lg transition transform hover:scale-105 flex items-center justify-center">
+                        <i class="fab fa-youtube mr-3 text-2xl"></i>
+                        Connect Your YouTube Channel
+                    </button>
+
+                    <div class="text-center text-gray-400 text-sm">
+                        <p>You'll be redirected to Google to authorize access to your YouTube channel.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 space-y-3 z-50"></div>
+
     <script src="js/app.js"></script>
 </body>
 </html>
